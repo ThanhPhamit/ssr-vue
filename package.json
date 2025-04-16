@@ -1,0 +1,31 @@
+{
+  "name": "@vitejs/test-ssr-vue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server",
+    "build": "npm run build:client && npm run build:server",
+    "build:noExternal": "npm run build:client && npm run build:server:noExternal",
+    "build:client": "vite build --ssrManifest .vite/ssr-manifest.json --outDir dist/client",
+    "build:server": "vite build --ssr src/entry-server.js --outDir dist/server",
+    "build:server:noExternal": "vite build --config vite.config.noexternal.js --ssr src/entry-server.js --outDir dist/server",
+    "generate": "vite build --ssrManifest .vite/ssr-manifest.json --outDir dist/static && npm run build:server && node prerender",
+    "serve": "NODE_ENV=production node server",
+    "debug": "node --inspect-brk server"
+  },
+  "dependencies": {
+    "@vitejs/test-example-external-component": "file:example-external-component",
+    "dotenv": "^16.5.0",
+    "pinia": "^3.0.1",
+    "vue": "^3.2.47",
+    "vue-router": "^4.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vitejs/plugin-vue-jsx": "^4.1.2",
+    "compression": "^1.8.0",
+    "express": "^4.21.2",
+    "serve-static": "^2.2.0"
+  }
+}
