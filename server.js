@@ -1,50 +1,51 @@
 // @ts-check
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import express from 'express'
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import express from "express";
+import dotenv from "dotenv";
+dotenv.config();
 
-import dotenv from 'dotenv'
-dotenv.config()
-console.log('process.env.MAPBOX_API_KEY', process.env.MAPBOX_API_KEY)
-console.log('process.env.NODE_ENV', process.env.NODE_ENV)
-
-const isTest = process.env.VITEST
+const isTest = process.env.VITEST === "true" || false;
 
 export async function createServer(
   root = process.cwd(),
-  isProd = process.env.NODE_ENV === 'production',
+  isProd = process.env.NODE_ENV === "production",
   hmrPort,
 ) {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url))
-  const resolve = (p) => path.resolve(__dirname, p)
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const resolve = (p) => path.resolve(__dirname, p);
+
+  console.log(isProd);
+  console.log(process.env.NODE_ENV);
+  console.log(process.env.API_KEY);
 
   const indexProd = isProd
-    ? fs.readFileSync(resolve('dist/client/index.html'), 'utf-8')
-    : ''
+    ? fs.readFileSync(resolve("dist/client/index.html"), "utf-8")
+    : "";
 
   const manifest = isProd
     ? JSON.parse(
       fs.readFileSync(
-        resolve('dist/client/.vite/ssr-manifest.json'),
-        'utf-8',
+        resolve("dist/client/.vite/ssr-manifest.json"),
+        "utf-8",
       ),
     )
-    : {}
+    : {};
 
-  const app = express()
+  const app = express();
 
   /**
    * @type {import('vite').ViteDevServer}
    */
-  let vite
+  let vite;
   if (!isProd) {
     vite = await (
-      await import('vite')
+      await import("vite")
     ).createServer({
-      base: '/test/',
+      base: "/",
       root,
-      logLevel: isTest ? 'error' : 'info',
+      logLevel: isTest ? "error" : "info",
       server: {
         middlewareMode: true,
         watch: {
@@ -57,58 +58,67 @@ export async function createServer(
           port: hmrPort,
         },
       },
-      appType: 'custom',
-    })
+      appType: "custom",
+    });
     // use vite's connect instance as middleware
-    app.use(vite.middlewares)
+    app.use(vite.middlewares);
   } else {
-    app.use((await import('compression')).default())
+    app.use((await import("compression")).default());
     app.use(
-      '/test/',
-      (await import('serve-static')).default(resolve('dist/client'), {
+      "/",
+      (await import("serve-static")).default(resolve("dist/client"), {
         index: false,
       }),
-    )
+    );
   }
 
-  app.use('*', async (req, res) => {
-    try {
-      const url = req.originalUrl.replace('/test/', '/')
+  app.use("/api/pong", async (req, res) => {
+    res.status(200).json({ status: "ok", message: "api/pong" });
+  });
 
-      let template, render
-      if (!isProd) {
-        // always read fresh template in dev
-        template = fs.readFileSync(resolve('index.html'), 'utf-8')
-        template = await vite.transformIndexHtml(url, template)
-        render = (await vite.ssrLoadModule('/src/entry-server.js')).render
-      } else {
-        template = indexProd
-        // @ts-ignore
-        render = (await import('./dist/server/entry-server.js')).render
+  app.use("*", async (req, res) => {
+    try {
+      const url = req.originalUrl || req.url;
+
+      if (url.startsWith("/api/")) {
+        res.status(200).json({ status: "ok", message: "pong" });
+        return;
       }
 
-      const [appHtml, preloadLinks] = await render(url, manifest)
+      let template, render;
+      if (!isProd) {
+        // always read fresh template in dev
+        template = fs.readFileSync(resolve("index.html"), "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        render = (await vite.ssrLoadModule("/src/entry-server.js")).render;
+      } else {
+        template = indexProd;
+        // @ts-ignore
+        render = (await import("./dist/server/entry-server.js")).render;
+      }
+
+      const [appHtml, preloadLinks] = await render(url, manifest);
 
       const html = template
         .replace(`<!--preload-links-->`, preloadLinks)
-        .replace(`<!--app-html-->`, appHtml)
+        .replace(`<!--app-html-->`, appHtml);
 
-      res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      vite && vite.ssrFixStacktrace(e)
-      console.log(e.stack)
-      res.status(500).end(e.stack)
+      vite && vite.ssrFixStacktrace(e);
+      console.log(e.stack);
+      res.status(500).end(e.stack);
     }
-  })
+  });
 
-  return { app, vite }
+  return { app, vite };
 }
 
 if (!isTest) {
-  createServer().then(({ app }) =>
+  createServer().then(({ app }) => {
     app.listen(6173, () => {
-      console.log('http://localhost:6173')
-    }),
-  )
+      console.log("http://localhost:6173");
+    });
+  });
 }
